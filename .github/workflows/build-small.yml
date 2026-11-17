@@ -1,0 +1,41 @@
+name: Build MAME (small test)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 300
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install tools
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-lld
+
+      - name: Build MAME (3 games)
+        run: |
+          make -j4 SUBTARGET=arcade3 \
+            SOURCES=src/mame/namco/galaga.cpp,src/mame/pacman/pacman.cpp,src/mame/technos/ddragon.cpp \
+            REGENIE=1 NOWERROR=1 ARCHOPTS=-fuse-ld=lld
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: mame-small
+          path: |
+            *.exe
