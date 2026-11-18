@@ -12,6 +12,7 @@
 #include "ui/selgame.h"
 
 #include "ui/auditmenu.h"
+#include "ui/gridhome.h"
 #include "ui/icorender.h"
 #include "ui/inifile.h"
 #include "ui/miscmenu.h"
@@ -541,6 +542,10 @@ void menu_select_game::force_game_select(mame_ui_manager &mui, render_target &ta
 	// drop any existing menus and start the system selection menu
 	menu::stack_reset(mui);
 	menu::stack_push_special_main<menu_select_game>(mui, target, nullptr);
+#if defined(XBOX_GRID_HOME)
+	// the Xbox build opens on the box-art grid; the classic list is underneath it
+	menu::stack_push<menu_grid_home>(mui, target);
+#endif
 	mui.show_menu(target);
 
 	// make sure MAME is paused

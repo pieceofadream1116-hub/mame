@@ -51,6 +51,13 @@ if (_OPTIONS["targetos"] == "windows") then
 	}
 end
 
+-- Xbox build: open on the box-art grid home screen
+if (_OPTIONS["osd"] == "uwp") then
+	defines {
+		"XBOX_GRID_HOME=1",
+	}
+end
+
 files {
 	MAME_DIR .. "src/frontend/mame/audit.cpp",
 	MAME_DIR .. "src/frontend/mame/audit.h",
@@ -165,6 +172,8 @@ files {
 	MAME_DIR .. "src/frontend/mame/ui/quitmenu.h",
 	MAME_DIR .. "src/frontend/mame/ui/selector.cpp",
 	MAME_DIR .. "src/frontend/mame/ui/selector.h",
+	MAME_DIR .. "src/frontend/mame/ui/gridhome.cpp",
+	MAME_DIR .. "src/frontend/mame/ui/gridhome.h",
 	MAME_DIR .. "src/frontend/mame/ui/selgame.cpp",
 	MAME_DIR .. "src/frontend/mame/ui/selgame.h",
 	MAME_DIR .. "src/frontend/mame/ui/selmenu.cpp",
