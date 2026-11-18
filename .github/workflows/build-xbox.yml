@@ -24,11 +24,14 @@ jobs:
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-python
 
-      - name: Generate Visual Studio Xbox project (3 games)
+      # Frank's list: Discs of Tron, Tron (mcr), Spy Hunter, Rampage (mcr3), After Burner,
+      # Toobin', Kangaroo, Q*bert, Marble Madness, Centipede, Missile Command, Ms. Pac-Man,
+      # Popeye, Out Run, Paperboy, Double Dragon, Galaga (and every other game in those files)
+      - name: Generate Visual Studio Xbox project (Frank's games)
         shell: msys2 {0}
         run: |
           make vs2022_uwp SUBTARGET=arcade3 \
-            SOURCES=src/mame/namco/galaga.cpp,src/mame/pacman/pacman.cpp,src/mame/technos/ddragon.cpp \
+            SOURCES=src/mame/namco/galaga.cpp,src/mame/pacman/pacman.cpp,src/mame/technos/ddragon.cpp,src/mame/bally/mcr.cpp,src/mame/bally/mcr3.cpp,src/mame/sega/segaxbd.cpp,src/mame/sega/segaorun.cpp,src/mame/atari/toobin.cpp,src/mame/atari/atarisy1.cpp,src/mame/atari/atarisy2.cpp,src/mame/atari/centiped.cpp,src/mame/atari/missile.cpp,src/mame/sunelectronics/kangaroo.cpp,src/mame/gottlieb/gottlieb.cpp,src/mame/nintendo/popeye.cpp \
             REGENIE=1 NOWERROR=1 PYTHON_EXECUTABLE=python
           find build/projects -name "*.sln"
 
