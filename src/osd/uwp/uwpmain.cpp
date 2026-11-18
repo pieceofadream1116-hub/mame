@@ -35,6 +35,7 @@
 #include "strconv.h"
 
 #include <chrono>
+#include <cstring>
 #include <cstdio>
 #include <fstream>
 #include <mutex>
@@ -168,6 +169,121 @@ private:
 
 
 //============================================================
+//  artwork and info folders on the drives
+//
+//  Box art, snapshots and the like are looked for in these
+//  folders on every drive, e.g. E:\MAME\flyers\galaga.png or
+//  E:\MAME\flyers.zip; descriptions (history.xml) in
+//  E:\MAME\history or E:\MAME\dats.
+//============================================================
+
+bool file_exists(std::string const &path)
+{
+	DWORD const attr = GetFileAttributesW(osd::text::to_wstring(path).c_str());
+	return (attr != INVALID_FILE_ATTRIBUTES) && !(attr & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+// the local folder, plus every drive's \MAME\<name> and \<name> that exist (as a folder or a .zip)
+std::string media_path(std::string const &local, char const *name)
+{
+	std::string result = local + "\\" + name;
+	for (char drive = 'C'; drive <= 'Z'; ++drive)
+	{
+		std::string const root = std::string(1, drive) + ":";
+		for (char const *base : { "\\MAME\\", "\\" })
+		{
+			std::string const candidate = root + base + name;
+			if (directory_exists(candidate) || file_exists(candidate + ".zip"))
+				result += ";" + candidate;
+		}
+	}
+	return result;
+}
+
+// set some keys in ui.ini, keeping everything else in it
+void update_ui_ini(std::string const &local, std::vector<std::pair<std::string, std::string> > const &values, file_log_output &log)
+{
+	std::string const path = local + "\\ui.ini";
+	std::vector<std::string> lines;
+	{
+		std::ifstream in(osd::text::to_wstring(path));
+		std::string line;
+		while (std::getline(in, line))
+			lines.emplace_back(line);
+	}
+
+	for (auto const &[key, value] : values)
+	{
+		std::string const quoted = (value.find(' ') != std::string::npos) ? ('"' + value + '"') : value;
+		std::string const newline = key + std::string((key.length() < 26) ? (26 - key.length()) : 1, ' ') + quoted;
+		bool found = false;
+		for (std::string &line : lines)
+		{
+			if ((line.compare(0, key.length(), key) == 0) && (line.length() > key.length()) && ((line[key.length()] == ' ') || (line[key.length()] == '\t')))
+			{
+				line = newline;
+				found = true;
+			}
+		}
+		if (!found)
+			lines.emplace_back(newline);
+	}
+
+	std::ofstream out(osd::text::to_wstring(path), std::ios::out | std::ios::trunc);
+	for (std::string const &line : lines)
+		out << line << '\n';
+	log.line("ui.ini updated");
+}
+
+void set_up_ui(std::string const &local, file_log_output &log)
+{
+	// folders for each kind of picture in the game list
+	char const *const art[][2] = {
+			{ "historypath",               "history" },
+			{ "cabinets_directory",        "cabinets" },
+			{ "cpanels_directory",         "cpanel" },
+			{ "pcbs_directory",            "pcb" },
+			{ "flyers_directory",          "flyers" },
+			{ "titles_directory",          "titles" },
+			{ "ends_directory",            "ends" },
+			{ "marquees_directory",        "marquees" },
+			{ "artwork_preview_directory", "artpreview" },
+			{ "bosses_directory",          "bosses" },
+			{ "logos_directory",           "logo" },
+			{ "scores_directory",          "scores" },
+			{ "versus_directory",          "versus" },
+			{ "gameover_directory",        "gameover" },
+			{ "howto_directory",           "howto" },
+			{ "select_directory",          "select" },
+			{ "icons_directory",           "icons" },
+			{ "covers_directory",          "covers" } };
+
+	std::vector<std::pair<std::string, std::string> > values;
+	for (auto const &[key, name] : art)
+	{
+		std::string path = media_path(local, name);
+		if (!std::strcmp(key, "historypath"))
+			path += ";" + media_path(local, "dats") + ";" + media_path(local, "MAME");
+		values.emplace_back(key, path);
+		make_directory(local + "\\" + name);
+	}
+
+	// first start only: show just the games you have, with box art (flyers) on the right
+	std::string const marker = local + "\\xbox-ui-defaults-1";
+	if (!file_exists(marker))
+	{
+		values.emplace_back("last_used_filter", "Available");
+		values.emplace_back("system_right_panel", "image");
+		values.emplace_back("system_right_image", "flyer");
+		values.emplace_back("skip_warnings", "1");
+		std::ofstream(osd::text::to_wstring(marker)) << "1\n";
+	}
+
+	update_ui_ini(local, values, log);
+}
+
+
+//============================================================
 //  build_arguments - MAME's command line on the Xbox
 //============================================================
 
@@ -208,7 +324,7 @@ std::vector<std::string> build_arguments(std::string const &local, file_log_outp
 			"-nvram_directory",  local + "\\nvram",
 			"-input_directory",  local + "\\inp",
 			"-state_directory",  local + "\\sta",
-			"-snapshot_directory", local + "\\snap",
+			"-snapshot_directory", media_path(local, "snap"),
 			"-diff_directory",   local + "\\diff",
 			"-comment_directory", local + "\\comments",
 			"-share_directory",  local + "\\share",
@@ -224,7 +340,15 @@ std::vector<std::string> build_arguments(std::string const &local, file_log_outp
 			"-output",           "none",
 			"-joystick",
 			"-skip_gameinfo",
+			// widescreen: stretch every game to fill the TV
+			"-nokeepaspect",
+			"-unevenstretch",
+			// turbo buttons (autofire) and saved high scores; the data plugin
+			// (game descriptions) is on by default
+			"-plugin",           "autofire,hiscore",
 			"-verbose" });
+
+	set_up_ui(local, log);
 
 	return args;
 }
