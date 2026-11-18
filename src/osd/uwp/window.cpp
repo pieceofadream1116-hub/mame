@@ -163,3 +163,13 @@ void windows_osd_interface::process_events(bool ingame, bool nodispatch)
 	m_last_event_check = std::chrono::steady_clock::now();
 	uwp_process_core_events();
 }
+
+
+//============================================================
+//  osd_set_aggressive_input_focus
+//============================================================
+
+void osd_set_aggressive_input_focus(bool aggressive_focus)
+{
+	// the Xbox app always has the controller's focus
+}

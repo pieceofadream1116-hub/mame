@@ -44,6 +44,7 @@
 
 // standard windows headers
 #include <windows.h>
+#include <wtypes.h>
 
 #include <winrt/Windows.ApplicationModel.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
@@ -610,10 +611,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView>
 
 
 //============================================================
-//  wWinMain - the app's entry point
+//  audio property keys used by the XAudio2 module
+//  (the Windows build gets these from another library)
 //============================================================
 
-int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int)
+extern "C" const PROPERTYKEY PKEY_AudioEndpoint_PhysicalSpeakers = { { 0x1da5d803, 0xd492, 0x4edd, { 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e } }, 3 };
+extern "C" const PROPERTYKEY PKEY_AudioEngine_DeviceFormat = { { 0xf19f064d, 0x082c, 0x4e27, { 0xbc, 0x73, 0x68, 0x82, 0xa1, 0xbb, 0x8e, 0x4c } }, 0 };
+
+
+//============================================================
+//  WinMain - the app's entry point
+//============================================================
+
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
 	winrt::init_apartment();
 	CoreApplication::Run(make<App>());
