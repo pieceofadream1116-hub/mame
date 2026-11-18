@@ -44,7 +44,12 @@ jobs:
           foreach ($proj in Get-ChildItem $sln.Directory.FullName -Filter *.vcxproj) {
             $text = Get-Content -Raw $proj.FullName
             if ($text -match '<ConfigurationType>Application</ConfigurationType>') {
-              $text = $text -replace '<Link>', "<Link>`r`n      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>"
+              # only the linker settings blocks: a <Link> tag alone on its line
+              # (files in the project also use <Link>path</Link>, which must stay as is)
+              $text = [regex]::Replace($text, '(?m)^([ \t]*)<Link>\r?$', {
+                param($m)
+                $m.Value.TrimEnd("`r") + "`r`n" + $m.Groups[1].Value + '  <GenerateWindowsMetadata>false</GenerateWindowsMetadata>' + "`r"
+              })
               Set-Content -NoNewline -Path $proj.FullName -Value $text
               Write-Host "No .winmd for $($proj.Name)"
             }
@@ -59,6 +64,7 @@ jobs:
           if (-not $exe) { Write-Host "No arcade3.exe was made"; exit 1 }
           Write-Host "Built $($exe.FullName) (msbuild exit code $code)"
           "EXE=$($exe.FullName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          exit 0
 
       - name: Make the Xbox app package
         shell: pwsh
