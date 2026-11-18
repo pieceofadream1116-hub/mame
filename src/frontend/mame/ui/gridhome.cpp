@@ -33,6 +33,7 @@
 #include "drivenum.h"
 #include "emuopts.h"
 #include "fileio.h"
+#include "input.h"
 #include "inputdev.h"
 #include "rendutil.h"
 
@@ -450,8 +451,8 @@ bool menu_grid_home::handle(event const *ev)
 
 void menu_grid_home::draw(uint32_t flags)
 {
-	m_px = float(std::max(1, target().width()));
-	m_py = float(std::max(1, target().height()));
+	m_px = float(std::max<int>(1, int(target().width())));
+	m_py = float(std::max<int>(1, int(target().height())));
 	m_s = m_py / 1080.0F;
 	m_loads_this_frame = 0;
 	float const s = m_s;
