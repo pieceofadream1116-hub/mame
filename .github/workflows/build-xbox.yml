@@ -1,0 +1,61 @@
+name: Build MAME Xbox (UWP)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install MSYS2 (make, python, gcc for the project generator)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
+
+      - name: Generate Visual Studio Xbox project (3 games)
+        shell: msys2 {0}
+        run: |
+          make vs2022_uwp SUBTARGET=arcade3 \
+            SOURCES=src/mame/namco/galaga.cpp,src/mame/pacman/pacman.cpp,src/mame/technos/ddragon.cpp \
+            REGENIE=1 NOWERROR=1 PYTHON_EXECUTABLE=python
+          find build/projects -name "*.sln"
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build with Visual Studio
+        shell: pwsh
+        run: |
+          $sln = Get-ChildItem -Recurse build/projects -Filter *.sln | Where-Object { $_.FullName -like '*winstore82*' } | Select-Object -First 1
+          Write-Host "Building $($sln.FullName)"
+          msbuild $sln.FullName /m /p:Configuration=Release /p:Platform=x64 `
+            /p:AppxPackageSigningEnabled=false /p:AppxBundle=Never `
+            /fl /flp:"logfile=build-errors.log;errorsonly"
+
+      - name: Upload error list
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-errors
+          path: build-errors.log
+          if-no-files-found: ignore
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: mame-xbox
+          path: |
+            build/**/AppPackages/**
+            build/**/*.appx
+          if-no-files-found: warn

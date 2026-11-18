@@ -42,6 +42,7 @@ newoption {
 	description = "Choose VS toolset",
 	allowed = {
 		{ "clangcl",       "Visual Studio using Clang/LLVM" },
+		{ "winstore82",    "Universal Windows App" },
 	},
 }
 
@@ -206,6 +207,21 @@ function toolchain(_buildDir, _subDir)
 			premake.vstudio.toolset = ("ClangCL")
 			location (_buildDir .. "projects/" .. _subDir .. "/".. _ACTION .. "-clang")
 		end
+
+		if "winstore82" == _OPTIONS["vs"] then
+			premake.vstudio.toolset = "v143"
+			premake.vstudio.storeapp = "10.0"
+
+			-- If needed, depending on GENie version, enable file-level configuration
+			if enablefilelevelconfig ~= nil then
+				enablefilelevelconfig()
+			end
+
+			local action = premake.action.current()
+			action.vstudio.windowsTargetPlatformVersion = "10.0.22621.0"
+
+			location (_buildDir .. "projects/" .. _subDir .. "/".. _ACTION .. "-winstore82")
+		end
 	elseif _ACTION == "vs2026" then
 
 		if "clangcl" == _OPTIONS["vs"] then
@@ -275,6 +291,15 @@ function toolchain(_buildDir, _subDir)
 	configuration { "vs*-clang" }
 		buildoptions {
 			"-Qunused-arguments",
+		}
+
+	configuration { "winphone8* or winstore8*" }
+		removeflags {
+			"StaticRuntime",
+			"NoExceptions",
+		}
+		flags {
+			"WinMain"
 		}
 
 	configuration { "mingw*" }

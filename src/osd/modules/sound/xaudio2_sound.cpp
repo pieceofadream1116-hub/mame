@@ -10,7 +10,7 @@
 
 #include "modules/osdmodule.h"
 
-#if defined(OSD_WINDOWS) | defined(SDLMAME_WIN32)
+#if defined(OSD_WINDOWS) || defined(SDLMAME_WIN32) || defined(OSD_UWP)
 
 // local headers
 #include "mmdevice_helpers.h"

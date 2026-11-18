@@ -523,6 +523,12 @@ configuration { "Release", "vs20*" }
 
 configuration {}
 
+if _OPTIONS["osd"] == "uwp" then
+	windowstargetplatformversion("10.0.22621.0")
+	windowstargetplatformminversion("10.0.14393.0")
+	premake._filelevelconfig = true
+end
+
 msgcompile ("Compiling $(subst ../,,$<)...")
 
 msgcompile_objc ("Objective-C compiling $(subst ../,,$<)...")
@@ -1243,6 +1249,8 @@ configuration { "vs20*" }
 			"_CRT_STDIO_LEGACY_WIDE_SPECIFIERS",
 		}
 
+-- Windows Store/Phone projects already link against the available libraries.
+if _OPTIONS["vs"]==nil or not (string.startswith(_OPTIONS["vs"], "winstore8") or string.startswith(_OPTIONS["vs"], "winphone8")) then
 		links {
 			"user32",
 			"winmm",
@@ -1255,8 +1263,9 @@ configuration { "vs20*" }
 			"shell32",
 			"userenv",
 		}
+end
 
-if _OPTIONS["vs"]==nil then
+if _OPTIONS["vs"]==nil or _OPTIONS["vs"]=="winstore82" then
 		buildoptions {
 			"/bigobj",
 			"/utf-8",
@@ -1387,6 +1396,13 @@ elseif _OPTIONS["SOURCEFILTER"] ~= nil then
 	end
 	load(OUT_STR)()
 end
+
+configuration { "winphone8* or winstore8*" }
+	linkoptions {
+		"/ignore:4264" -- LNK4264: archiving object file compiled with /ZW into a static library
+	}
+
+configuration {}
 
 group "libs"
 

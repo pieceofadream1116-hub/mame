@@ -1170,6 +1170,13 @@ ifdef MSBUILD
 	$(SILENT) msbuild.exe $(PROJECTDIR_WIN)/vs2022-clang/$(PROJECT_NAME).sln $(MSBUILD_PARAMS)
 endif
 
+.PHONY: vs2022_uwp
+vs2022_uwp: generate
+	$(SILENT) $(GENIE) $(PARAMS) $(TARGET_PARAMS) --vs=winstore82 --osd=uwp --NO_USE_MIDI=1 --NO_OPENGL=1 --USE_QTDEBUG=0 --NO_USE_PORTAUDIO=1 --NO_USE_PIPEWIRE=1 --NO_USE_PULSEAUDIO=1 vs2022
+ifdef MSBUILD
+	$(SILENT) msbuild.exe $(PROJECTDIR_WIN)/vs2022-winstore82/$(PROJECT_NAME).sln $(MSBUILD_PARAMS)
+endif
+
 #-------------------------------------------------
 # Visual Studio 2026
 #-------------------------------------------------

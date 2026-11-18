@@ -9,7 +9,7 @@
 
 #include "modules/lib/osdlib.h"
 
-#if defined(OSD_WINDOWS)
+#if defined(OSD_WINDOWS) || defined(OSD_UWP)
 
 #include "corestr.h"
 

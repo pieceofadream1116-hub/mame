@@ -653,6 +653,11 @@ if _OPTIONS["vs"]==nil then
 		}
 end
 
+	configuration { "winstore*" }
+		defines {
+			"NO_GETENV"
+		}
+
 	configuration { }
 
 	files {
@@ -882,6 +887,11 @@ if _OPTIONS["vs"]==nil then
 			"/wd4457", -- warning C4457: declaration of 'xxx' hides function parameter
 		}
 end
+	configuration { "winstore*" }
+		forcedincludes {
+			MAME_DIR .. "src/osd/uwp/uwpcompat.h"
+		}
+
 	configuration { }
 		defines {
 			"Z7_PPMD_SUPPORT",
@@ -968,6 +978,11 @@ if _OPTIONS["vs"]==nil then
 		}
 end
 
+	configuration { "winstore*" }
+		forcedincludes {
+			MAME_DIR .. "src/osd/uwp/uwpcompat.h"
+		}
+
 	configuration { }
 	if (_OPTIONS["targetos"] ~= "windows") and (_OPTIONS["targetos"] ~= "asmjs") then
 		defines {
@@ -1053,8 +1068,12 @@ end
 
 	includedirs {
 		MAME_DIR .. "3rdparty",
+	}
+if (_OPTIONS["osd"] ~= "uwp") then
+	includedirs {
 		MAME_DIR .. "3rdparty/linenoise",
 	}
+end
 
 	includedirs {
 		ext_includedir("lua"),
@@ -1062,14 +1081,27 @@ end
 		ext_includedir("sqlite3"),
 	}
 
+	configuration { "winstore*" }
+		forcedincludes {
+			MAME_DIR .. "src/osd/uwp/uwpcompat.h"
+		}
+
 	configuration {}
 
 	files {
 		MAME_DIR .. "3rdparty/lsqlite3/lsqlite3.c",
 		MAME_DIR .. "3rdparty/lua-zlib/lua_zlib.c",
 		MAME_DIR .. "3rdparty/luafilesystem/src/lfs.c",
+	}
+if (_OPTIONS["osd"] == "uwp") then
+	files {
+		MAME_DIR .. "3rdparty/lua-linenoise/linenoise_none.c",
+	}
+else
+	files {
 		MAME_DIR .. "3rdparty/lua-linenoise/linenoise.c",
 	}
+end
 
 --------------------------------------------------
 -- SQLite3 library objects
@@ -1107,6 +1139,11 @@ if _OPTIONS["vs"]=="clangcl" then
 			"-Wno-error=unused-variable",
 		}
 end
+
+	configuration { "winstore*" }
+		defines {
+			"SQLITE_OS_WINRT",
+		}
 
 	configuration { }
 
@@ -1781,6 +1818,7 @@ end
 -- linenoise library
 --------------------------------------------------
 
+if (_OPTIONS["osd"] ~= "uwp") then
 project "linenoise"
 	uuid "7320ffc8-2748-4add-8864-ae29b72a8511"
 	kind (LIBTYPE)
@@ -1809,6 +1847,7 @@ end
 		MAME_DIR .. "3rdparty/linenoise/stringbuf.c",
 		MAME_DIR .. "3rdparty/linenoise/utf8.c",
 	}
+end
 
 
 --------------------------------------------------
