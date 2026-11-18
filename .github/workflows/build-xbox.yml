@@ -40,6 +40,15 @@ jobs:
         run: |
           $sln = Get-ChildItem -Recurse build/projects -Filter *.sln | Where-Object { $_.FullName -like '*winstore82*' } | Select-Object -First 1
           Write-Host "Building $($sln.FullName)"
+          # the app defines no Windows Runtime types, so don't make (or expect) a .winmd file
+          foreach ($proj in Get-ChildItem $sln.Directory.FullName -Filter *.vcxproj) {
+            $text = Get-Content -Raw $proj.FullName
+            if ($text -match '<ConfigurationType>Application</ConfigurationType>') {
+              $text = $text -replace '<Link>', "<Link>`r`n      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>"
+              Set-Content -NoNewline -Path $proj.FullName -Value $text
+              Write-Host "No .winmd for $($proj.Name)"
+            }
+          }
           msbuild $sln.FullName /m /p:Configuration=Release /p:Platform=x64 `
             /p:AppxPackageSigningEnabled=false /p:AppxBundle=Never /p:GenerateAppxPackageOnBuild=true `
             /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageDir="$PWD\pkg\" `
