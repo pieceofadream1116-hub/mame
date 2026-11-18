@@ -49,11 +49,16 @@ jobs:
               Write-Host "No .winmd for $($proj.Name)"
             }
           }
+          # build only: Visual Studio's own app packaging trips over MAME's project,
+          # so the next step makes the package itself
           msbuild $sln.FullName /m /p:Configuration=Release /p:Platform=x64 `
-            /p:AppxPackageSigningEnabled=false /p:AppxBundle=Never /p:GenerateAppxPackageOnBuild=true `
-            /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageDir="$PWD\pkg\" `
+            /p:AppxPackage=false /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=false `
             /fl /flp:"logfile=build-errors.log;errorsonly"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $code = $LASTEXITCODE
+          $exe = Get-ChildItem -Path . -Filter arcade3.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { Write-Host "No arcade3.exe was made"; exit 1 }
+          Write-Host "Built $($exe.FullName) (msbuild exit code $code)"
+          "EXE=$($exe.FullName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
       - name: Make the Xbox app package
         shell: pwsh
@@ -61,20 +66,58 @@ jobs:
           $kit = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Directory | Where-Object { $_.Name -like '10.*' } | Sort-Object Name -Descending | Select-Object -First 1
           $tools = Join-Path $kit.FullName "x64"
 
-          # unpack the package Visual Studio made (exe, AppxManifest.xml, resources.pri, logos)
-          $built = Get-ChildItem -Recurse pkg -Filter *.appx | Where-Object { $_.Name -notlike '*VCLibs*' } | Select-Object -First 1
-          if (-not $built) { throw "Visual Studio made no .appx" }
-          Write-Host "Built package: $($built.FullName)"
+          # the app layout: the program, its logos, the manifest and MAME's data folders
           $layout = Join-Path $PWD "layout"
-          & (Join-Path $tools makeappx.exe) unpack /o /p $built.FullName /d $layout
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $layout "AppxSignature.p7x"), (Join-Path $layout "AppxBlockMap.xml"), (Join-Path $layout "[Content_Types].xml")
-          Get-ChildItem $layout | Format-Table Name, Length
-
-          # MAME's data folders (bgfx shaders, hash files, plugins, artwork, languages)
-          foreach ($dir in 'bgfx', 'hash', 'plugins', 'artwork', 'language', 'ini') {
+          New-Item -ItemType Directory -Force -Path (Join-Path $layout "Assets") | Out-Null
+          Copy-Item $env:EXE (Join-Path $layout "mame.exe")
+          foreach ($png in Get-ChildItem scripts/resources/uwp/assets -Filter *.png) {
+            $name = $png.Name -replace '\.scale-200', '' -replace '\.targetsize-24_altform-unplated', '-24'
+            Copy-Item $png.FullName (Join-Path $layout "Assets\$name")
+          }
+          foreach ($dir in 'bgfx', 'hash', 'plugins', 'artwork', 'language') {
             if (Test-Path $dir) { Copy-Item -Recurse -Force $dir (Join-Path $layout $dir) }
           }
+
+          $manifest = @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+                   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+                   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+                   IgnorableNamespaces="uap rescap">
+            <Identity Name="MAMEXbox" Publisher="CN=MAMEXbox" Version="0.1.$($env:GITHUB_RUN_NUMBER).0" ProcessorArchitecture="x64" />
+            <Properties>
+              <DisplayName>MAME</DisplayName>
+              <PublisherDisplayName>MAME Xbox port</PublisherDisplayName>
+              <Logo>Assets\StoreLogo.png</Logo>
+            </Properties>
+            <Dependencies>
+              <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+              <PackageDependency Name="Microsoft.VCLibs.140.00" MinVersion="14.0.30035.0" Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" />
+            </Dependencies>
+            <Resources>
+              <Resource Language="en-us" />
+            </Resources>
+            <Applications>
+              <Application Id="App" Executable="mame.exe" EntryPoint="Mame.App">
+                <uap:VisualElements DisplayName="MAME" Description="MAME for Xbox" BackgroundColor="#000000"
+                                    Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
+                  <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+                  <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#000000" />
+                </uap:VisualElements>
+              </Application>
+            </Applications>
+            <Capabilities>
+              <Capability Name="internetClient" />
+              <Capability Name="codeGeneration" />
+              <Capability Name="privateNetworkClientServer" />
+              <rescap:Capability Name="broadFileSystemAccess" />
+              <uap:Capability Name="removableStorage" />
+            </Capabilities>
+          </Package>
+          "@
+          Set-Content -Path (Join-Path $layout "AppxManifest.xml") -Value $manifest.Trim() -Encoding utf8
+          Get-ChildItem $layout | Format-Table Name, Length
+          Get-ChildItem (Join-Path $layout "Assets") | Format-Table Name, Length
 
           # signing certificate; its name must match Publisher="CN=MAMEXbox" in the manifest
           $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=MAMEXbox" -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(10)
@@ -89,10 +132,10 @@ jobs:
 
           # the C++ runtime package the app depends on (add it as a dependency in Device Portal)
           $vclibs = Get-ChildItem -Recurse "C:\Program Files (x86)\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Microsoft.VCLibs" -Filter "Microsoft.VCLibs.x64.14.00.appx" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match 'Retail' } | Select-Object -First 1
-          if ($vclibs) { Copy-Item $vclibs.FullName . }
+          if ($vclibs) { Copy-Item $vclibs.FullName . } else { Write-Host "VCLibs package not found on the build machine" }
 
       - name: Upload error list
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-errors
