@@ -11,6 +11,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: uwp-port
           fetch-depth: 1
 
       - name: Install MSYS2 (make, python, gcc for the project generator)
