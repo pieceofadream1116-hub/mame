@@ -128,11 +128,10 @@ jobs:
           Get-ChildItem $layout | Format-Table Name, Length
           Get-ChildItem (Join-Path $layout "Assets") | Format-Table Name, Length
 
-          # signing certificate; its name must match Publisher="CN=MAMEXbox" in the manifest
-          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=MAMEXbox" -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(10)
-          $pw = ConvertTo-SecureString -String "mamexbox" -Force -AsPlainText
-          Export-PfxCertificate -Cert $cert -FilePath MAMEXbox.pfx -Password $pw | Out-Null
-          Export-Certificate -Cert $cert -FilePath MAMEXbox.cer | Out-Null
+          # the same signing certificate every build (its name must match Publisher="CN=MAMEXbox"),
+          # so a new version installs over the old one and keeps its settings and Game mode
+          Copy-Item scripts\resources\uwp\MAMEXbox.pfx MAMEXbox.pfx
+          Copy-Item scripts\resources\uwp\MAMEXbox.cer MAMEXbox.cer
 
           & (Join-Path $tools makeappx.exe) pack /o /d $layout /p MAMEXbox.appx
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
