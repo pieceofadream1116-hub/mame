@@ -176,7 +176,7 @@ LSX 15  C
 
 #include "modules/osdmodule.h"
 
-#if defined(OSD_WINDOWS) || defined(SDLMAME_WIN32)
+#if defined(OSD_WINDOWS) || defined(SDLMAME_WIN32) || defined(OSD_UWP)
 
 #include "input_xinput.h"
 
@@ -3034,6 +3034,13 @@ private:
 
 int xinput_api_helper::initialize()
 {
+#if defined(OSD_UWP)
+	// Xbox: XInput-style readings come from Windows.Gaming.Input (src/osd/uwp/uwpinput.cpp)
+	XInputGetState = &uwp_xinput_get_state;
+	XInputGetCapabilities = &uwp_xinput_get_capabilities;
+	return 0;
+#endif
+
 	m_xinput_dll = dynamic_module::open(XINPUT_LIBRARIES);
 
 	XInputGetState = m_xinput_dll->bind<xinput_get_state_fn>("XInputGetState");
@@ -3131,7 +3138,7 @@ std::unique_ptr<device_info> xinput_api_helper::create_xinput_device(
 
 } // namespace osd
 
-#else // defined(OSD_WINDOWS) || defined(SDLMAME_WIN32)
+#else // defined(OSD_WINDOWS) || defined(SDLMAME_WIN32) || defined(OSD_UWP)
 
 #include "input_module.h"
 

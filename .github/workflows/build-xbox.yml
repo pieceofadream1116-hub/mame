@@ -41,11 +41,49 @@ jobs:
           $sln = Get-ChildItem -Recurse build/projects -Filter *.sln | Where-Object { $_.FullName -like '*winstore82*' } | Select-Object -First 1
           Write-Host "Building $($sln.FullName)"
           msbuild $sln.FullName /m /p:Configuration=Release /p:Platform=x64 `
-            /p:AppxPackageSigningEnabled=false /p:AppxBundle=Never `
+            /p:AppxPackageSigningEnabled=false /p:AppxBundle=Never /p:GenerateAppxPackageOnBuild=true `
+            /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageDir="$PWD\pkg\" `
             /fl /flp:"logfile=build-errors.log;errorsonly"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Make the Xbox app package
+        shell: pwsh
+        run: |
+          $kit = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Directory | Where-Object { $_.Name -like '10.*' } | Sort-Object Name -Descending | Select-Object -First 1
+          $tools = Join-Path $kit.FullName "x64"
+
+          # unpack the package Visual Studio made (exe, AppxManifest.xml, resources.pri, logos)
+          $built = Get-ChildItem -Recurse pkg -Filter *.appx | Where-Object { $_.Name -notlike '*VCLibs*' } | Select-Object -First 1
+          if (-not $built) { throw "Visual Studio made no .appx" }
+          Write-Host "Built package: $($built.FullName)"
+          $layout = Join-Path $PWD "layout"
+          & (Join-Path $tools makeappx.exe) unpack /o /p $built.FullName /d $layout
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $layout "AppxSignature.p7x"), (Join-Path $layout "AppxBlockMap.xml"), (Join-Path $layout "[Content_Types].xml")
+          Get-ChildItem $layout | Format-Table Name, Length
+
+          # MAME's data folders (bgfx shaders, hash files, plugins, artwork, languages)
+          foreach ($dir in 'bgfx', 'hash', 'plugins', 'artwork', 'language', 'ini') {
+            if (Test-Path $dir) { Copy-Item -Recurse -Force $dir (Join-Path $layout $dir) }
+          }
+
+          # signing certificate; its name must match Publisher="CN=MAMEXbox" in the manifest
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=MAMEXbox" -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(10)
+          $pw = ConvertTo-SecureString -String "mamexbox" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath MAMEXbox.pfx -Password $pw | Out-Null
+          Export-Certificate -Cert $cert -FilePath MAMEXbox.cer | Out-Null
+
+          & (Join-Path $tools makeappx.exe) pack /o /d $layout /p MAMEXbox.appx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & (Join-Path $tools signtool.exe) sign /fd SHA256 /a /f MAMEXbox.pfx /p mamexbox MAMEXbox.appx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          # the C++ runtime package the app depends on (add it as a dependency in Device Portal)
+          $vclibs = Get-ChildItem -Recurse "C:\Program Files (x86)\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Microsoft.VCLibs" -Filter "Microsoft.VCLibs.x64.14.00.appx" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match 'Retail' } | Select-Object -First 1
+          if ($vclibs) { Copy-Item $vclibs.FullName . }
 
       - name: Upload error list
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: build-errors
@@ -57,6 +95,7 @@ jobs:
         with:
           name: mame-xbox
           path: |
-            build/**/AppPackages/**
-            build/**/*.appx
+            MAMEXbox.appx
+            MAMEXbox.cer
+            Microsoft.VCLibs.x64.14.00.appx
           if-no-files-found: warn

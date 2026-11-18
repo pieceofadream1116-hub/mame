@@ -15,6 +15,12 @@
 #include <xinput.h>
 
 
+#if defined(OSD_UWP)
+// Xbox (UWP): Windows.Gaming.Input gamepads presented through the XInput API shape
+DWORD WINAPI uwp_xinput_get_state(DWORD dwUserIndex, XINPUT_STATE *pState);
+DWORD WINAPI uwp_xinput_get_capabilities(DWORD dwUserIndex, DWORD dwFlags, XINPUT_CAPABILITIES *pCapabilities);
+#endif
+
 namespace osd {
 
 class xinput_api_helper

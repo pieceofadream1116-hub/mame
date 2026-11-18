@@ -142,6 +142,21 @@ std::pair<std::error_condition, unsigned> osd_get_cache_line_size() noexcept
 }
 
 
+#if defined(OSD_UWP)
+
+// The Xbox has no Win32 clipboard
+std::string osd_get_clipboard_text() noexcept
+{
+	return std::string();
+}
+
+std::error_condition osd_set_clipboard_text(std::string_view text) noexcept
+{
+	return std::errc::operation_not_supported;
+}
+
+#else // defined(OSD_UWP)
+
 //============================================================
 //  get_clipboard_text_by_format
 //============================================================
@@ -284,6 +299,8 @@ std::error_condition osd_set_clipboard_text(std::string_view text) noexcept
 		return std::errc::not_enough_memory;
 	}
 }
+
+#endif // defined(OSD_UWP)
 
 //============================================================
 //  osd_getpid

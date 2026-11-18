@@ -5,7 +5,7 @@
 //  osdsync.c - OSD core work item functions
 //
 //============================================================
-#if defined(OSD_WINDOWS) || defined(SDLMAME_WIN32)
+#if defined(OSD_WINDOWS) || defined(SDLMAME_WIN32) || defined(OSD_UWP)
 // standard windows headers
 #include <windows.h>
 #include <process.h>
@@ -224,7 +224,7 @@ static osd_work_item *queue_multiple(osd_work_queue *queue, osd_work_callback ca
 
 int thread_adjust_priority(std::thread *thread, int adjust)
 {
-#if defined(OSD_WINDOWS) || defined(SDLMAME_WIN32)
+#if defined(OSD_WINDOWS) || defined(SDLMAME_WIN32) || defined(OSD_UWP)
 	if (adjust)
 		SetThreadPriority((HANDLE)thread->native_handle(), THREAD_PRIORITY_ABOVE_NORMAL);
 	else

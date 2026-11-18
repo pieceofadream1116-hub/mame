@@ -1398,8 +1398,16 @@ elseif _OPTIONS["SOURCEFILTER"] ~= nil then
 end
 
 configuration { "winphone8* or winstore8*" }
-	linkoptions {
-		"/ignore:4264" -- LNK4264: archiving object file compiled with /ZW into a static library
+	-- MAME needs C++20, which can't be mixed with C++/CX (/ZW); the Xbox code uses C++/WinRT instead
+	flags {
+		"NoWinRT",
+	}
+	buildoptions {
+		"/sdl-",
+	}
+	-- build everything as normal Win32 code (Xbox Dev Mode allows it); see uwpdesktop.h
+	forcedincludes {
+		MAME_DIR .. "src/osd/uwp/uwpdesktop.h",
 	}
 
 configuration {}

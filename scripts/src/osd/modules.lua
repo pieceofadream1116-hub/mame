@@ -112,7 +112,6 @@ function osdmodulesbuild()
 		MAME_DIR .. "src/osd/modules/input/input_windows.cpp",
 		MAME_DIR .. "src/osd/modules/input/input_windows.h",
 		MAME_DIR .. "src/osd/modules/input/input_winhybrid.cpp",
-		MAME_DIR .. "src/osd/modules/input/input_uwp.cpp",
 		MAME_DIR .. "src/osd/modules/input/input_winsdl.cpp",
 		MAME_DIR .. "src/osd/modules/input/input_x11.cpp",
 		MAME_DIR .. "src/osd/modules/input/input_xinput.cpp",
@@ -580,7 +579,12 @@ function osdmodulestargetconf()
 		end
 	end
 
-	if _OPTIONS["targetos"]=="windows" then
+	if _OPTIONS["osd"]=="uwp" then
+		links {
+			"dxguid",
+			"oleaut32",
+		}
+	elseif _OPTIONS["targetos"]=="windows" then
 		links {
 			"gdi32",
 			"dsound",

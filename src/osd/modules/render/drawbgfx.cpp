@@ -43,7 +43,7 @@
 #include <bx/math.h>
 #include <bx/readerwriter.h>
 
-#if defined(SDLMAME_WIN32) || defined(OSD_WINDOWS)
+#if defined(SDLMAME_WIN32) || defined(OSD_WINDOWS) || defined(OSD_UWP)
 // standard windows headers
 #include <windows.h>
 #if defined(SDLMAME_WIN32) && !defined(SDLMAME_SDL3)
@@ -448,6 +448,10 @@ bool video_bgfx::set_platform_data(bgfx::PlatformData &platform_data, osd_window
 #if defined(OSD_WINDOWS)
 	platform_data.ndt = nullptr;
 	platform_data.nwh = dynamic_cast<win_window_info const &>(window).platform_window();
+#elif defined(OSD_UWP)
+	// CoreWindow: bgfx (built for WinRT) makes a swap chain for it when ndt is null
+	platform_data.ndt = nullptr;
+	platform_data.nwh = dynamic_cast<uwp_window_info const &>(window).platform_window();
 #elif defined(OSD_MAC)
 	platform_data.ndt = nullptr;
 	platform_data.nwh = GetOSWindow(dynamic_cast<mac_window_info const &>(window).platform_window());
@@ -710,6 +714,8 @@ int renderer_bgfx::create()
 	{
 #ifdef OSD_WINDOWS
 		m_framebuffer = m_targets->create_backbuffer(dynamic_cast<win_window_info &>(window()).platform_window(), wdim.width(), wdim.height());
+#elif defined(OSD_UWP)
+		m_framebuffer = m_targets->create_backbuffer(dynamic_cast<uwp_window_info &>(window()).platform_window(), wdim.width(), wdim.height());
 #elif defined(OSD_MAC)
 		m_framebuffer = m_targets->create_backbuffer(GetOSWindow(dynamic_cast<mac_window_info &>(window()).platform_window()), wdim.width(), wdim.height());
 #else
@@ -1437,6 +1443,8 @@ bool renderer_bgfx::update_dimensions()
 		{
 #ifdef OSD_WINDOWS
 			m_framebuffer = m_targets->create_backbuffer(dynamic_cast<win_window_info &>(window()).platform_window(), m_dimensions.width(), m_dimensions.height());
+#elif defined(OSD_UWP)
+			m_framebuffer = m_targets->create_backbuffer(dynamic_cast<uwp_window_info &>(window()).platform_window(), m_dimensions.width(), m_dimensions.height());
 #elif defined(OSD_MAC)
 			m_framebuffer = m_targets->create_backbuffer(GetOSWindow(dynamic_cast<mac_window_info &>(window()).platform_window()), m_dimensions.width(), m_dimensions.height());
 #else

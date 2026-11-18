@@ -1,151 +1,81 @@
 // license:BSD-3-Clause
-// copyright-holders:Aaron Giles, Brad Hughes
+// copyright-holders:MAMEdev Team
 //============================================================
 //
-//  window.h - UWP window handling
+//  window.h - Xbox (UWP) window handling
+//
+//  There is exactly one window on the Xbox: the app's
+//  CoreWindow. MAME's render target is drawn into it with
+//  bgfx (Direct3D 11 swap chain for the CoreWindow).
 //
 //============================================================
+#ifndef MAME_OSD_UWP_WINDOW_H
+#define MAME_OSD_UWP_WINDOW_H
 
-#ifndef __UWP_WINDOW__
-#define __UWP_WINDOW__
+#pragma once
 
-// standard windows headers
-#include <windows.h>
-#include <windowsx.h>
-#include <mmsystem.h>
-#include <inspectable.h>
-#include <agile.h>
-
-#include <chrono>
-#include <mutex>
-#include <memory>
-#include <list>
-
+#include "emucore.h"
 #include "render.h"
 
 #include "modules/osdwindow.h"
 
-//============================================================
-//  PARAMETERS
-//============================================================
+#include <memory>
 
 
 //============================================================
-//  CONSTANTS
+//  helpers provided by uwpmain.cpp
 //============================================================
 
-#define RESIZE_STATE_NORMAL     0
-#define RESIZE_STATE_RESIZING   1
-#define RESIZE_STATE_PENDING    2
+// ABI pointer (an IUnknown *) to the app's CoreWindow, for bgfx
+void *uwp_core_window_abi();
 
+// size of the CoreWindow in physical pixels
+osd_dim uwp_core_window_size();
+
+// does the app currently have focus / is it visible?
+bool uwp_app_has_focus();
+
+// pump the CoreWindow event queue without blocking
+void uwp_process_core_events();
+
+// show or hide the system pointer
+void uwp_set_pointer_visible(bool visible);
 
 
 //============================================================
-//  TYPE DEFINITIONS
+//  uwp_window_info
 //============================================================
 
-class uwp_window_info  : public osd_window_t<Platform::Agile<Windows::UI::Core::CoreWindow>>
+class uwp_window_info : public osd_window_t<void *>
 {
 public:
-	uwp_window_info(running_machine &machine, int index, std::shared_ptr<osd_monitor_info> monitor, const osd_window_config *config);
+	uwp_window_info(
+			running_machine &machine,
+			render_module &renderprovider,
+			int index,
+			const std::shared_ptr<osd_monitor_info> &monitor,
+			const osd_window_config *config);
 
-	void update() override;
+	static std::unique_ptr<uwp_window_info> create(
+			running_machine &machine,
+			render_module &renderprovider,
+			int index,
+			const std::shared_ptr<osd_monitor_info> &monitor,
+			const osd_window_config *config);
 
-	virtual osd_dim get_size() override
-	{
-		auto bounds = platform_window()->Bounds;
-		return osd_dim(bounds.Width, bounds.Height);
-	}
+	virtual osd_dim get_size() override;
 
-	bool win_has_menu() override
-	{
-		return false;
-	}
+	virtual void update() override;
 
-	void capture_pointer() override;
-	void release_pointer() override;
-	void show_pointer() override;
-	void hide_pointer() override;
+	virtual void capture_pointer() override { }
+	virtual void release_pointer() override { }
+	virtual void show_pointer() override { uwp_set_pointer_visible(true); }
+	virtual void hide_pointer() override { uwp_set_pointer_visible(false); }
 
-	void complete_destroy() override;
-
-	// static
-
-	static void create(running_machine &machine, int index, std::shared_ptr<osd_monitor_info> monitor, const osd_window_config *config);
-
-	// member variables
-
-	volatile int        m_init_state;
-
-	// window handle and info
-	RECT                m_non_fullscreen_bounds;
-	int                 m_startmaximized;
-	int                 m_isminimized;
-	int                 m_ismaximized;
-
-	// monitor info
-	int                                m_fullscreen_safe;
-	float                              m_aspect;
-
-	// rendering info
-	std::mutex          m_render_lock;
-	unsigned            m_targetview;
-	int                 m_targetorient;
-	render_layer_config m_targetlayerconfig;
-	u32                 m_targetvismask;
-
-	// input info
-	std::chrono::system_clock::time_point  m_lastclicktime;
-	int                                    m_lastclickx;
-	int                                    m_lastclicky;
+	virtual void complete_destroy() override;
 
 private:
-	int complete_create();
-	void draw_video_contents(bool update);
-	int wnd_extra_width();
-	int wnd_extra_height();
-	osd_rect constrain_to_aspect_ratio(const osd_rect &rect, int adjustment);
-	osd_dim get_min_bounds(int constrain);
-	osd_dim get_max_bounds(int constrain);
-	void update_minmax_state();
-	void minimize_window();
-	void maximize_window();
-	void adjust_window_position_after_major_change();
-	void set_fullscreen(int fullscreen);
-
-	static POINT        s_saved_cursor_pos;
-
-	static Windows::UI::Core::CoreCursor^ s_cursor;
+	bool complete_create();
 };
 
-struct osd_draw_callbacks
-{
-	osd_renderer *(*create)(osd_window *window);
-	void (*exit)(void);
-};
-
-
-//============================================================
-//  PROTOTYPES
-//============================================================
-
-bool winwindow_has_focus(void);
-void winwindow_process_events(running_machine &machine, bool ingame, bool nodispatch);
-void winwindow_process_events_periodic(running_machine &machine);
-
-//============================================================
-//  rect_width / rect_height
-//============================================================
-
-static inline int rect_width(const RECT *rect)
-{
-	return rect->right - rect->left;
-}
-
-
-static inline int rect_height(const RECT *rect)
-{
-	return rect->bottom - rect->top;
-}
-
-#endif
+#endif // MAME_OSD_UWP_WINDOW_H

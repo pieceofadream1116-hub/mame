@@ -653,11 +653,6 @@ if _OPTIONS["vs"]==nil then
 		}
 end
 
-	configuration { "winstore*" }
-		defines {
-			"NO_GETENV"
-		}
-
 	configuration { }
 
 	files {
@@ -887,11 +882,6 @@ if _OPTIONS["vs"]==nil then
 			"/wd4457", -- warning C4457: declaration of 'xxx' hides function parameter
 		}
 end
-	configuration { "winstore*" }
-		forcedincludes {
-			MAME_DIR .. "src/osd/uwp/uwpcompat.h"
-		}
-
 	configuration { }
 		defines {
 			"Z7_PPMD_SUPPORT",
@@ -977,11 +967,6 @@ if _OPTIONS["vs"]==nil then
 			"/wd4310", -- warning C4310: cast truncates constant value
 		}
 end
-
-	configuration { "winstore*" }
-		forcedincludes {
-			MAME_DIR .. "src/osd/uwp/uwpcompat.h"
-		}
 
 	configuration { }
 	if (_OPTIONS["targetos"] ~= "windows") and (_OPTIONS["targetos"] ~= "asmjs") then
@@ -1081,11 +1066,6 @@ end
 		ext_includedir("sqlite3"),
 	}
 
-	configuration { "winstore*" }
-		forcedincludes {
-			MAME_DIR .. "src/osd/uwp/uwpcompat.h"
-		}
-
 	configuration {}
 
 	files {
@@ -1139,11 +1119,6 @@ if _OPTIONS["vs"]=="clangcl" then
 			"-Wno-error=unused-variable",
 		}
 end
-
-	configuration { "winstore*" }
-		defines {
-			"SQLITE_OS_WINRT",
-		}
 
 	configuration { }
 
@@ -1251,6 +1226,13 @@ project "bx"
 	uuid "238318fe-49f5-4eb4-88be-0618900f5eac"
 	kind "StaticLib"
 
+	-- Xbox (UWP): keep these in the Windows app partition so bgfx draws to the CoreWindow
+	configuration { "winstore*" }
+		defines {
+			"UWP_KEEP_APP_PARTITION",
+		}
+	configuration { }
+
 	defines {
 		"__STDC_LIMIT_MACROS",
 		"__STDC_FORMAT_MACROS",
@@ -1334,6 +1316,13 @@ project "bx"
 project "bimg"
 	uuid "5603611b-8bf8-4ffd-85bc-76858cd7df39"
 	kind "StaticLib"
+
+	-- Xbox (UWP): keep these in the Windows app partition so bgfx draws to the CoreWindow
+	configuration { "winstore*" }
+		defines {
+			"UWP_KEEP_APP_PARTITION",
+		}
+	configuration { }
 
 	includedirs {
 		MAME_DIR .. "3rdparty/bx/include",
@@ -1465,6 +1454,13 @@ project "bimg"
 project "bgfx"
 	uuid "d3e7e119-35cf-4f4f-aba0-d3bdcd1b879a"
 	kind "StaticLib"
+
+	-- Xbox (UWP): keep these in the Windows app partition so bgfx draws to the CoreWindow
+	configuration { "winstore*" }
+		defines {
+			"UWP_KEEP_APP_PARTITION",
+		}
+	configuration { }
 
 	configuration { "vs*" }
 if _OPTIONS["vs"]==nil then
