@@ -307,34 +307,68 @@ menu_grid_home::art &menu_grid_home::art_for(ui_system_info const &system, bool 
 	if (parent >= 0)
 		names.emplace_back(driver_list::driver(parent).name);
 
-	auto bitmap = std::make_unique<bitmap_argb32>();
-	for (char const *path : paths)
+	// Load the picture, then shrink it to tile size. Flyer scans can be 2000x3000 or more
+	// (about 24 MB each); keeping a dozen of those full size ran the Xbox out of memory.
+	// A bad or unreadable picture just means the tile shows the game's name instead.
+	try
 	{
-		emu_file file(path, OPEN_FLAG_READ);
-		for (std::string const &name : names)
+		bitmap_argb32 full;
+		for (char const *path : paths)
 		{
-			if (!file.open(name + ".png"))
+			emu_file file(path, OPEN_FLAG_READ);
+			for (std::string const &name : names)
 			{
-				render_load_png(*bitmap, file);
-				file.close();
+				if (!file.open(name + ".png"))
+				{
+					render_load_png(full, file);
+					file.close();
+				}
+				if (!full.valid() && !file.open(name + ".jpg"))
+				{
+					render_load_jpeg(full, file);
+					file.close();
+				}
+				if (full.valid())
+					break;
 			}
-			if (!bitmap->valid() && !file.open(name + ".jpg"))
-			{
-				render_load_jpeg(*bitmap, file);
-				file.close();
-			}
-			if (bitmap->valid())
+			if (full.valid())
 				break;
 		}
-		if (bitmap->valid())
-			break;
-	}
 
-	if (bitmap->valid())
+		if (full.valid())
+		{
+			constexpr int MAX_W = 360, MAX_H = 450; // plenty for a 200x250 tile, even at 4K
+			float const fit = std::min({ 1.0F, float(MAX_W) / full.width(), float(MAX_H) / full.height() });
+			int const w = std::max(1, int(full.width() * fit + 0.5F));
+			int const h = std::max(1, int(full.height() * fit + 0.5F));
+			int const fw = full.width(), fh = full.height();
+			std::unique_ptr<bitmap_argb32> bitmap;
+			if (fit < 1.0F)
+			{
+				bitmap = std::make_unique<bitmap_argb32>(w, h);
+				render_resample_argb_bitmap_hq(*bitmap, full, render_color{ 1.0F, 1.0F, 1.0F, 1.0F }, true);
+			}
+			else
+			{
+				bitmap = std::make_unique<bitmap_argb32>(std::move(full)); // already small
+			}
+			result.texture = machine().render().texture_alloc();
+			result.texture->set_bitmap(*bitmap, bitmap->cliprect(), TEXFORMAT_ARGB32);
+			result.bitmap = std::move(bitmap);
+			osd_printf_verbose("Box art for %s: %dx%d, shown at %dx%d\n", system.driver->name, fw, fh, w, h);
+		}
+	}
+	catch (std::exception const &e)
 	{
-		result.texture = machine().render().texture_alloc();
-		result.texture->set_bitmap(*bitmap, bitmap->cliprect(), TEXFORMAT_ARGB32);
-		result.bitmap = std::move(bitmap);
+		osd_printf_warning("Box art for %s skipped: %s\n", system.driver->name, e.what());
+		result.texture = nullptr;
+		result.bitmap.reset();
+	}
+	catch (...)
+	{
+		osd_printf_warning("Box art for %s skipped\n", system.driver->name);
+		result.texture = nullptr;
+		result.bitmap.reset();
 	}
 	return result;
 }

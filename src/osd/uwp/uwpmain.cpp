@@ -37,6 +37,8 @@
 #include <chrono>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
+#include <exception>
 #include <fstream>
 #include <mutex>
 #include <string>
@@ -52,6 +54,7 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Display.h>
 #include <winrt/Windows.Storage.h>
+#include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.Core.h>
 #include <winrt/Windows.UI.ViewManagement.h>
 
@@ -166,6 +169,62 @@ private:
 	std::ofstream m_file;
 	std::mutex m_mutex;
 };
+
+
+//============================================================
+//  crash report: if the app ever closes unexpectedly, the last
+//  line of mame-log.txt says so, with the memory it was using
+//============================================================
+
+std::wstring g_crash_log_path;
+
+std::string memory_text()
+{
+	try
+	{
+		using winrt::Windows::System::MemoryManager;
+		auto const mb = [] (uint64_t bytes) { return std::to_string(bytes / (1024 * 1024)) + " MB"; };
+		return "memory used " + mb(MemoryManager::AppMemoryUsage()) + " of " + mb(MemoryManager::AppMemoryUsageLimit()) + " allowed";
+	}
+	catch (...)
+	{
+		return "memory use unknown";
+	}
+}
+
+void append_crash_line(std::string const &text)
+{
+	if (g_crash_log_path.empty())
+		return;
+	std::ofstream file(g_crash_log_path, std::ios::out | std::ios::app);
+	file << "\n*** CRASH: " << text << " (" << memory_text() << ")\n";
+}
+
+LONG WINAPI crash_filter(EXCEPTION_POINTERS *info)
+{
+	char code[64];
+	std::snprintf(code, sizeof(code), "exception 0x%08lX", info && info->ExceptionRecord ? static_cast<unsigned long>(info->ExceptionRecord->ExceptionCode) : 0UL);
+	std::string text(code);
+	if (info && info->ExceptionRecord && info->ExceptionRecord->ExceptionCode == 0xC0000005)
+		text += " (bad memory access)";
+	else if (info && info->ExceptionRecord && info->ExceptionRecord->ExceptionCode == 0xC0000017)
+		text += " (out of memory)";
+	else if (info && info->ExceptionRecord && info->ExceptionRecord->ExceptionCode == 0xE06D7363)
+		text += " (C++ exception)";
+	append_crash_line(text);
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void install_crash_report(std::string const &log_path)
+{
+	g_crash_log_path = osd::text::to_wstring(log_path);
+	SetUnhandledExceptionFilter(crash_filter);
+	std::set_terminate([] ()
+	{
+		append_crash_line("the app stopped because of an error it couldn't handle");
+		std::abort();
+	});
+}
 
 
 //============================================================
@@ -700,6 +759,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView>
 		file_log_output log(local + "\\mame-log.txt");
 		log.line("MAME for Xbox starting");
 		log.line("LocalState: " + local);
+		log.line("Start: " + memory_text());
+		install_crash_report(local + "\\mame-log.txt");
 
 		// start the controllers and give them a moment to show up
 		uwp_input_start();
@@ -725,7 +786,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView>
 			result = emulator_info::start_frontend(options, osd, args);
 			osd_output::pop(&log);
 		}
-		log.line("MAME finished with result " + std::to_string(result));
+		log.line("MAME finished with result " + std::to_string(result) + " (" + memory_text() + ")");
 
 		CoreApplication::Exit();
 	}
